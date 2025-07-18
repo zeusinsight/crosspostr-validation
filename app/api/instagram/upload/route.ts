@@ -152,8 +152,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, instagram_post_id: publishJson.id });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Instagram upload error", e);
-    return NextResponse.json({ error: "upload_failed", message: e.message ?? e }, { status: 500 });
+    return NextResponse.json({ error: "upload_failed", message: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
 }

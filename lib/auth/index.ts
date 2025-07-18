@@ -1,5 +1,4 @@
 import { createClient } from "../supabase/server";
-import { NextRequest } from "next/server";
 
 /**
  * Get the authenticated user from a request
@@ -7,11 +6,10 @@ import { NextRequest } from "next/server";
  * @param req The Next.js request object
  * @returns The authenticated user and supabase client
  */
-export async function getUserFromRequest(req: NextRequest) {
+export async function getUserFromRequest() {
   const supabase = await createClient();
   const {
     data: { user },
-    error: userErr,
   } = await supabase.auth.getUser();
   
   return { user, supabase };

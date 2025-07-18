@@ -101,8 +101,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.redirect(`${redirectUrl}?success=instagram_connected`);
 
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Facebook callback error:", e);
-    return NextResponse.redirect(`${redirectUrl}?error=instagram_connection_failed&error_description=${e.message}`);
+    return NextResponse.redirect(`${redirectUrl}?error=instagram_connection_failed&error_description=${e instanceof Error ? e.message : 'Unknown error'}`);
   }
 }

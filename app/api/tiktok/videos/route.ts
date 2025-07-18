@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   try {
     // Get user from request using the getUserFromRequest function as specified in user rules
-    const { user, supabase } = await getUserFromRequest(req);
+    const { user } = await getUserFromRequest();
     const adminClient = createAdminClient();
     
     if (!user) {
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     const apiUrl = `https://open.tiktokapis.com/v2/video/list/?fields=${fields}`;
     
     // Prepare request body according to the example
-    const requestBody: any = {};
+    const requestBody: Record<string, unknown> = {};
     
     // Add max_count parameter (default to 10, max 20)
     const limit = parseInt(maxCount, 10);
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
           error: "tiktok_api_error", 
           message: `Failed to fetch videos: ${videosResponse.status} ${JSON.stringify(errorData)}` 
         }, { status: videosResponse.status });
-      } catch (e) {
+      } catch {
         const errorText = await videosResponse.text();
         console.error("TikTok API error (non-JSON):", {
           status: videosResponse.status,
@@ -122,11 +122,11 @@ export async function GET(req: NextRequest) {
       has_more: videosData.data?.has_more || false
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching TikTok videos:", error);
     return NextResponse.json({ 
       error: "unexpected_error", 
-      message: error.message || "An unexpected error occurred" 
+      message: error instanceof Error ? error.message : "An unexpected error occurred" 
     }, { status: 500 });
   }
 }

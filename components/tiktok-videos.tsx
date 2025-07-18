@@ -70,8 +70,8 @@ export function TikTokVideos() {
       
       setCursor(data.cursor);
       setHasMore(data.has_more);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while fetching TikTok videos');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred while fetching TikTok videos');
       console.error('Error fetching TikTok videos:', err);
     } finally {
       setLoading(false);

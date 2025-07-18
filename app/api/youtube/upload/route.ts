@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import axios from "axios";
 // We don't need fs or stream in this implementation
@@ -10,7 +9,7 @@ import { getUserFromRequest } from "@/lib/auth";
 // multipart/form-data { file, title, description, tags }
 export async function POST(req: NextRequest) {
   // Use the getUserFromRequest function as specified in user rules
-  const { user, supabase } = await getUserFromRequest(req);
+  const { user, supabase } = await getUserFromRequest();
   if (!user) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
@@ -182,9 +181,9 @@ export async function POST(req: NextRequest) {
         fileData = Buffer.from(arrayBuffer);
         fileSize = fileData.length;
         fileType = response.headers.get('content-type') || 'video/mp4';
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`[YouTube] Failed to download video from URL:`, err);
-        throw new Error(`Failed to download video from URL: ${err.message || String(err)}`);
+        throw new Error(`Failed to download video from URL: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
     
@@ -255,13 +254,19 @@ export async function POST(req: NextRequest) {
         youtube_video_url: `https://www.youtube.com/watch?v=${videoId}` 
       });
     
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("YouTube upload error:", e);
     
     // Try to extract a meaningful error message
-    let errorMessage = e.message;
-    if (e.response?.data?.error?.message) {
-      errorMessage = e.response.data.error.message;
+    let errorMessage = e instanceof Error ? e.message : String(e);
+    if (e && typeof e === 'object' && 'response' in e) {
+      const response = (e as Record<string, unknown>).response;
+      if (response && typeof response === 'object' && 'data' in response) {
+        const data = response.data as Record<string, unknown>;
+        if (data?.error && typeof data.error === 'object' && 'message' in data.error) {
+          errorMessage = String(data.error.message);
+        }
+      }
     }
     
     return NextResponse.json({ 

@@ -34,7 +34,6 @@ interface Post {
 export function UploadHistory() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
   const PAGE_SIZE = 10;
 
   useEffect(() => {
@@ -62,7 +61,6 @@ export function UploadHistory() {
       }
 
       setPosts(data || []);
-      setHasMore(data?.length === PAGE_SIZE);
       setIsLoading(false);
     };
 

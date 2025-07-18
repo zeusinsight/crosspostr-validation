@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       if (!uploadRes.ok) throw new Error(await uploadRes.text());
     }
 
-    let commitData: any = null;
+    let commitData: unknown = null;
     if (upload_url) {
       // FILE_UPLOAD flow — need commit
       const commitRes = await fetch("https://open.tiktokapis.com/v2/post/publish/video/commit/", {
@@ -120,8 +120,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, publish_id, commit: commitData });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("TikTok upload error", e);
-    return NextResponse.json({ error: "upload_failed", message: e.message ?? e }, { status: 500 });
+    return NextResponse.json({ error: "upload_failed", message: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
 }

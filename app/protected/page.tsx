@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SocialConnections } from "@/components/social-connections";
 import { VideoUpload } from "@/components/video-upload";
-import { UploadHistory } from "@/components/upload-history";
 import { Button } from "@/components/ui/button";
 import { TikTokVideos } from "@/components/tiktok-videos";
 import { useEffect, useState } from "react";

@@ -20,8 +20,8 @@ const navigation = {
     { name: "Press", href: "#" },
   ],
   legal: [
-    { name: "Privacy", href: "#" },
-    { name: "Terms", href: "#" },
+    { name: "Privacy", href: "/privacy" },
+    { name: "Terms", href: "/terms" },
     { name: "Cookie Policy", href: "#" },
   ],
   social: [

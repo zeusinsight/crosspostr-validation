@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 export async function GET() {
   const csrfState = Math.random().toString(36).substring(7);

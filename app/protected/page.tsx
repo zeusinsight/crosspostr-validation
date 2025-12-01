@@ -5,11 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import { SocialConnections } from "@/components/social-connections";
 import { VideoUpload } from "@/components/video-upload";
 import { FacebookPageSelector } from "@/components/facebook-page-selector";
-import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { useSocialConnections } from "@/hooks/use-social-connections";
+import { Suspense } from "react";
 
-export default function ProtectedPage() {
+function ProtectedPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
@@ -79,5 +79,18 @@ export default function ProtectedPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ProtectedPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex-1 w-full flex flex-col items-center justify-center gap-4 py-16">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="text-muted-foreground">Loading your dashboard...</p>
+      </div>
+    }>
+      <ProtectedPageContent />
+    </Suspense>
   );
 }

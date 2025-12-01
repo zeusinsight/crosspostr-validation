@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   // Upload file to Supabase storage first to get a public URL for Instagram API
   const adminSupabase = await createAdminClient();
   const fileName = `${user.id}/${Date.now()}_${file.name}`;
-  const { data: uploadData, error: uploadErr } = await adminSupabase.storage
+  const { error: uploadErr } = await adminSupabase.storage
     .from('videos')
     .upload(fileName, file);
 

@@ -4,11 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "edge"; // faster upload handling
 
-/**
- * Expects multipart/form-data with fields:
- *  - file: video binary (<= 1min, mp4/mov)
- *  - description: caption for the video
- */
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user }, error: userErr } = await supabase.auth.getUser();

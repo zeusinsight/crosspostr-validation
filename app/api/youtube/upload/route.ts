@@ -3,10 +3,6 @@ import axios from "axios";
 // We don't need fs or stream in this implementation
 import { getUserFromRequest } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-// Note: Make sure the lib/auth.ts file is properly configured
-
-// POST /api/youtube/upload
-// multipart/form-data { file, description, tags }
 export async function POST(req: NextRequest) {
   // Use the getUserFromRequest function as specified in user rules
   const { user, supabase } = await getUserFromRequest();

@@ -63,19 +63,7 @@ export async function GET(req: NextRequest) {
 
     const accessToken = tokenData.access_token;
 
-    // 2) Fetch user profile info
-    const userInfoRes = await fetch(`https://graph.facebook.com/v19.0/me?fields=id,name,picture.type(large)&access_token=${accessToken}`);
-    if (!userInfoRes.ok) {
-      console.error("Failed to fetch Facebook user info", await userInfoRes.text());
-      throw new Error("User info fetch failed");
-    }
-    const userInfo: {
-      id: string;
-      name: string;
-      picture?: { data?: { url?: string } };
-    } = await userInfoRes.json();
-
-    // 2.1) Fetch user pages
+    // 2) Fetch user pages
 const pagesRes = await fetch(`https://graph.facebook.com/v19.0/me/accounts?fields=id,name,picture,access_token&access_token=${accessToken}`);
 if (!pagesRes.ok) {
   console.error("Failed to fetch Facebook pages", await pagesRes.text());
@@ -93,9 +81,7 @@ const pagesData: {
 
     // 3) Validate state from query vs cookie for CSRF protection
     const stateParam = searchParams.get("state") || "";
-    const stateData = verifyStateCookie(stateParam);
-    const context = stateData?.context || "destination";
-    const flowId = stateData?.flowId;
+    verifyStateCookie(stateParam);
 
     // 4) Ensure user authenticated
     const { user } = await getUserFromRequest();

@@ -7,7 +7,7 @@ export const runtime = "edge"; // faster upload handling
 /**
  * Expects multipart/form-data with fields:
  *  - file: video binary (<= 1min, mp4/mov)
- *  - title: optional caption/title
+ *  - description: caption for the video
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   // get user's tiktok social connection
   const { data: conn, error: connErr } = await supabase
-    .from("social_connections")
+    .from("platform_validation")
     .select("access_token")
     .eq("user_id", user.id)
     .eq("platform", "tiktok")
@@ -30,21 +30,13 @@ export async function POST(req: NextRequest) {
 
   const contentType = req.headers.get("content-type") || "";
 
-  let publicUrl: string | null = null;
   let file: File | null = null;
-  let title = "";
+  let description = "";
 
-  if (contentType.startsWith("application/json")) {
-    const body = await req.json();
-    publicUrl = body.video_url as string | null;
-    title = body.title ?? "";
-    if (!publicUrl) {
-      return NextResponse.json({ error: "video_url_required" }, { status: 400 });
-    }
-  } else if (contentType.startsWith("multipart/form-data")) {
+  if (contentType.startsWith("multipart/form-data")) {
     const formData = await req.formData();
     file = formData.get("file") as File | null;
-    title = (formData.get("title") as string | null) ?? "";
+    description = (formData.get("description") as string | null) ?? "";
     if (!file) {
       return NextResponse.json({ error: "file_required" }, { status: 400 });
     }
@@ -52,24 +44,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unsupported_content_type" }, { status: 400 });
   }
 
-  // If we don't yet have a publicUrl, upload to Storage
-  if (!publicUrl) {
-    const adminClient = createAdminClient();
-    const ext = (file!.name?.split(".").pop()) || "mp4";
-    const storagePath = `tiktok/${crypto.randomUUID()}.${ext}`;
-    const { error: storageErr } = await adminClient.storage.from("videos").upload(storagePath, file!, {
-      contentType: file!.type || "video/mp4",
-      upsert: false,
-    });
-    if (storageErr) {
-      console.error("Storage upload error", storageErr);
-      return NextResponse.json({ error: "storage_upload_failed" }, { status: 500 });
+  try {
+    // Upload file to Supabase storage for backup
+    const adminSupabase = await createAdminClient();
+    const fileName = `${user.id}/${Date.now()}_${file.name}`;
+    const { error: uploadErr } = await adminSupabase.storage
+      .from('videos')
+      .upload(fileName, file);
+
+    if (uploadErr) {
+      console.error('Supabase upload error', uploadErr);
+      // Don't fail the request, just log the error
+      console.warn('Continuing with TikTok upload despite storage error');
     }
-    publicUrl = adminClient.storage.from("videos").getPublicUrl(storagePath).data.publicUrl;
-  }
 
+    // Direct file upload approach for TikTok
+    const fileBuffer = await file.arrayBuffer();
+    const fileBlob = new Blob([fileBuffer], { type: file.type });
 
-    try {
     // 1. Initialize upload session
     const initRes = await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/", {
       method: "POST",
@@ -79,47 +71,43 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         post_info: {
-          title,
+          title: description,
           privacy_level: "SELF_ONLY",
         },
         source_info: {
-          source: "PULL_FROM_URL",
-          video_url: publicUrl,
+          source: "FILE_UPLOAD",
+          video_size: fileBlob.size,
+          chunk_size: fileBlob.size, // Upload in single chunk
+          total_chunk_count: 1,
         },
       }),
     });
-    if (!initRes.ok) throw new Error(await initRes.text());
+    if (!initRes.ok) {
+      const errorText = await initRes.text();
+      console.error(`TikTok init failed with status ${initRes.status}:`, errorText);
+      throw new Error(`TikTok init failed: ${initRes.status} - ${errorText}`);
+    }
     const initData = await initRes.json();
     const { upload_url, publish_id } = initData.data;
 
-    // If FILE_UPLOAD flow, TikTok returns upload_url; for PULL_FROM_URL it's undefined.
-    if (upload_url && file) {
+    // 2. Upload file directly to TikTok
+    if (upload_url) {
       const uploadRes = await fetch(upload_url, {
         method: "PUT",
         headers: {
           "Content-Type": "application/octet-stream",
+          "Content-Range": `bytes 0-${fileBlob.size - 1}/${fileBlob.size}`,
         },
-        body: file.stream(),
+        body: fileBlob,
       });
-      if (!uploadRes.ok) throw new Error(await uploadRes.text());
+      if (!uploadRes.ok) {
+        const uploadErrorText = await uploadRes.text();
+        console.error(`TikTok upload failed with status ${uploadRes.status}:`, uploadErrorText);
+        throw new Error(`TikTok upload failed: ${uploadRes.status} - ${uploadErrorText}`);
+      }
     }
 
-    let commitData: unknown = null;
-    if (upload_url) {
-      // FILE_UPLOAD flow — need commit
-      const commitRes = await fetch("https://open.tiktokapis.com/v2/post/publish/video/commit/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${conn.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ publish_id }),
-      });
-      if (!commitRes.ok) throw new Error(await commitRes.text());
-      commitData = await commitRes.json();
-    }
-
-    return NextResponse.json({ success: true, publish_id, commit: commitData });
+    return NextResponse.json({ success: true, publish_id });
   } catch (e: unknown) {
     console.error("TikTok upload error", e);
     return NextResponse.json({ error: "upload_failed", message: e instanceof Error ? e.message : String(e) }, { status: 500 });

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import axios from "axios";
 // We don't need fs or stream in this implementation
 import { getUserFromRequest } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 // Note: Make sure the lib/auth.ts file is properly configured
 
 // POST /api/youtube/upload
-// multipart/form-data { file, title, description, tags }
+// multipart/form-data { file, description, tags }
 export async function POST(req: NextRequest) {
   // Use the getUserFromRequest function as specified in user rules
   const { user, supabase } = await getUserFromRequest();
@@ -16,27 +16,14 @@ export async function POST(req: NextRequest) {
 
   const contentType = req.headers.get("content-type") || "";
 
-  let publicUrl: string | null = null;
   let file: File | null = null;
-  let title = "";
   let description = "";
   let tags: string[] = [];
   let isShorts = false;
 
-  if (contentType.startsWith("application/json")) {
-    const body = await req.json();
-    publicUrl = body.video_url as string | null;
-    title = body.title ?? "";
-    description = body.description ?? "";
-    tags = body.tags ?? [];
-    isShorts = body.isShorts === true;
-    if (!publicUrl) {
-      return NextResponse.json({ error: "video_url_required" }, { status: 400 });
-    }
-  } else if (contentType.startsWith("multipart/form-data")) {
+  if (contentType.startsWith("multipart/form-data")) {
     const formData = await req.formData();
     file = formData.get("file") as File | null;
-    title = (formData.get("title") as string | null) ?? "";
     description = (formData.get("description") as string | null) ?? "";
     const tagsString = (formData.get("tags") as string | null) ?? "";
     tags = tagsString.split(",").filter(tag => tag.trim() !== "").map(tag => tag.trim());
@@ -51,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   // Fetch YouTube connection
   const { data: conn, error: connErr } = await supabase
-    .from("social_connections")
+    .from("platform_validation")
     .select("access_token, refresh_token, token_expires_at")
     .eq("user_id", user.id)
     .eq("platform", "youtube")
@@ -97,7 +84,7 @@ export async function POST(req: NextRequest) {
       
       // Update the token in the database
       await supabase
-        .from("social_connections")
+        .from("platform_validation")
         .update({
           access_token: accessToken,
           token_expires_at: expiryDate.toISOString(),
@@ -110,23 +97,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // If we don't yet have a publicUrl (i.e., multipart upload), first upload the file to Supabase Storage
-  if (!publicUrl && file) {
-    const admin = createAdminClient();
-    const ext = (file.name?.split(".").pop()) || "mp4";
-    const storagePath = `youtube/${crypto.randomUUID()}.${ext}`;
-    const { error: uploadErr } = await admin.storage.from("videos").upload(storagePath, file, {
-      contentType: file.type || "video/mp4",
-      upsert: false,
-    });
-    if (uploadErr) {
-      console.error("Storage upload error", uploadErr);
-      return NextResponse.json({ error: "storage_upload_failed" }, { status: 500 });
-    }
-    publicUrl = admin.storage.from("videos").getPublicUrl(storagePath).data.publicUrl;
-  }
-
   try {
+    // Upload file to Supabase storage for backup
+    const adminSupabase = await createAdminClient();
+    const fileName = `${user.id}/${Date.now()}_${file.name}`;
+    const { error: uploadErr } = await adminSupabase.storage
+      .from('videos')
+      .upload(fileName, file);
+
+    if (uploadErr) {
+      console.error('Supabase upload error', uploadErr);
+      // Don't fail the request, just log the error
+      console.warn('Continuing with YouTube upload despite storage error');
+    }
+
     // Prepare description for Shorts if needed
     if (isShorts) {
       // Add #shorts hashtag if not already present
@@ -142,12 +126,12 @@ export async function POST(req: NextRequest) {
       console.log(`[YouTube] Uploading as YouTube Shorts`);
     }
     
-    console.log(`[YouTube] Starting upload for video: ${title}`);
+    console.log(`[YouTube] Starting upload for video: ${description}`);
     
     // Use fetch directly instead of googleapis library
     const videoMetadata = {
       snippet: {
-        title,
+        title: description,
         description,
         tags,
         categoryId: '22', // People & Blogs category
@@ -158,45 +142,18 @@ export async function POST(req: NextRequest) {
       },
     };
     
-    // Get the file content and size if we have a file
-    let fileData: Buffer | null = null;
-    let fileSize = 0;
-    let fileType = 'video/mp4';
+    // Get the file content
+    const arrayBuffer = await file.arrayBuffer();
+    const fileData = Buffer.from(arrayBuffer);
+    const fileSize = fileData.length;
+    const fileType = file.type || 'video/mp4';
     
-    if (file) {
-      // For file uploads, we need to get the buffer and size
-      const arrayBuffer = await file.arrayBuffer();
-      fileData = Buffer.from(arrayBuffer);
-      fileSize = fileData.length;
-      fileType = file.type || 'video/mp4';
-    } else if (publicUrl) {
-      // For URL uploads, we need to download the file first
-      try {
-        const response = await fetch(publicUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to download video from URL: ${response.statusText}`);
-        }
-        
-        const arrayBuffer = await response.arrayBuffer();
-        fileData = Buffer.from(arrayBuffer);
-        fileSize = fileData.length;
-        fileType = response.headers.get('content-type') || 'video/mp4';
-      } catch (err: unknown) {
-        console.error(`[YouTube] Failed to download video from URL:`, err);
-        throw new Error(`Failed to download video from URL: ${err instanceof Error ? err.message : String(err)}`);
-      }
+    // Make sure description is not too long (YouTube has a 100 character limit for titles)
+    if (description.length > 100) {
+      description = description.slice(0, 97) + '...';
     }
     
-    if (!fileData) {
-      throw new Error('No file data available for upload');
-    }
-    
-    // Make sure title is not too long (YouTube has a 100 character limit)
-    if (title.length > 100) {
-      title = title.slice(0, 97) + '...';
-    }
-    
-    console.log(`[YouTube] Initiating upload session for video: ${title} (${fileSize} bytes)`);
+    console.log(`[YouTube] Initiating upload session for video: ${description} (${fileSize} bytes)`);
     
     // Step 1: Create upload session
       const initResponse = await axios.post(
@@ -247,7 +204,7 @@ export async function POST(req: NextRequest) {
       const videoId = videoData.id;
       
       console.log(`[YouTube] Upload successful, video ID: ${videoId}`);
-      
+
       return NextResponse.json({ 
         success: true, 
         youtube_video_id: videoId,

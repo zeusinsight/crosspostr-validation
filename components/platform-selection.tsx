@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 interface Platform {
   id: string;
-  name: "tiktok" | "instagram" | "youtube";
+  name: "tiktok" | "instagram" | "youtube" | "facebook";
   isConnected: boolean;
   isSelected: boolean;
 }
@@ -22,6 +22,7 @@ export function PlatformSelection({
     { id: "tiktok", name: "tiktok", isConnected: false, isSelected: false },
     { id: "instagram", name: "instagram", isConnected: false, isSelected: false },
     { id: "youtube", name: "youtube", isConnected: false, isSelected: false },
+    { id: "facebook", name: "facebook", isConnected: false, isSelected: false },
   ]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -29,7 +30,7 @@ export function PlatformSelection({
     const loadConnectedPlatforms = async () => {
       const supabase = createClient();
       const { data: connections, error } = await supabase
-        .from("social_connections")
+        .from("platform_validation")
         .select("platform");
 
       if (error) {

@@ -1,115 +1,59 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TikTokLoginButton } from "./tiktok-login-button";
-import { InstagramLoginButton } from "./instagram-login-button";
-import { YouTubeLoginButton } from "./youtube-login-button";
-import { createClient } from "@/lib/supabase/client";
+import { useSocialConnections } from "@/hooks/use-social-connections";
 
-type Platform = "tiktok" | "instagram" | "youtube";
-
-interface SocialConnection {
-  platform: Platform;
-  platform_username: string | null;
-  access_token: string | null;
-  refresh_token: string | null;
-  connected: boolean;
-}
+const PlatformIcon = ({ platform }: { platform: string }) => {
+  switch (platform) {
+    case "tiktok":
+      return (
+        <Image
+          src="/tiktoklogo.png"
+          alt="tiktok logo"
+          width={40}
+          height={40}
+          className="text-black"
+        />
+      );
+    case "instagram":
+      return (
+        <Image
+          src="/instagramlogo.webp"
+          alt="Instagram logo"
+          width={40}
+          height={40}
+          className="text-black"
+        />
+        
+      );
+    case "youtube":
+      return (
+        <Image
+          src="/Youtube_logo.png"
+          alt="YouTube logo"
+          width={40}
+          height={40}
+          className="text-black"
+        />
+      );
+    case "facebook":
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="currentColor" className="text-blue-600">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+      );
+    default:
+      return <div className="w-10 h-10 bg-gray-200 rounded-full" />;
+  }
+};
 
 export function SocialConnections() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [connections, setConnections] = useState<SocialConnection[]>([
-    { platform: "tiktok", platform_username: null, access_token: null, refresh_token: null, connected: false },
-    { platform: "instagram", platform_username: null, access_token: null, refresh_token: null, connected: false },
-    { platform: "youtube", platform_username: null, access_token: null, refresh_token: null, connected: false },
-  ]);
+  const { connections, isLoading, handleDisconnect } = useSocialConnections();
 
-  useEffect(() => {
-    const loadConnections = async () => {
-      const supabase = createClient();
-      const { data: socialConnections, error } = await supabase
-        .from("social_connections")
-        .select("platform, access_token, refresh_token, platform_username");
-
-      if (error) {
-        console.error("Error loading social connections:", error);
-        return;
-      }
-
-      setConnections(prev =>
-        prev.map(conn => {
-          const existingConnection = socialConnections?.find(
-            sc => sc.platform === conn.platform
-          );
-          return existingConnection
-            ? {
-                ...conn,
-                access_token: "demo_access_token",
-                refresh_token: "demo_refresh_token",
-                platform_username: existingConnection.platform_username,
-                connected: true,
-              }
-            : conn;
-        })
-      );
-      setIsLoading(false);
-    };
-
-    loadConnections();
-  }, []);
-
-  const handleConnect = async (platform: Platform) => {
-    // In a real implementation, this would redirect to the platform's OAuth flow
-    // For demo purposes, we'll just update the local state and database
-    const username = window.prompt(`Enter your ${platform} username for demo:`);
-    if (!username) return;
-
-    const supabase = createClient();
-    const { error } = await supabase.from("social_connections").upsert({
-      platform,
-      platform_username: username,
-      // Demo values for tokens
-      access_token: "demo_access_token",
-      refresh_token: "demo_refresh_token",
-      token_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-    });
-
-    if (error) {
-      console.error("Error connecting account:", error);
-      return;
-    }
-
-    setConnections(prev =>
-      prev.map(conn =>
-        conn.platform === platform
-          ? { ...conn, platform_username: username, connected: true }
-          : conn
-      )
-    );
-  };
-
-  const handleDisconnect = async (platform: Platform) => {
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("social_connections")
-      .delete()
-      .eq("platform", platform);
-
-    if (error) {
-      console.error("Error disconnecting account:", error);
-      return;
-    }
-
-    setConnections(prev =>
-      prev.map(conn =>
-        conn.platform === platform
-          ? { ...conn, platform_username: null, connected: false }
-          : conn
-      )
-    );
-  };
+  const connectedPlatform = connections.find(c => c.connected);
+  const displayConnections = connectedPlatform ? [connectedPlatform] : connections;
 
   return (
     <Card>
@@ -124,41 +68,49 @@ export function SocialConnections() {
           <div className="text-center py-4">Loading connections...</div>
         ) : (
           <div className="grid gap-4">
-            {connections.map(({ platform, platform_username, connected }) => (
-              <div
-                key={platform}
-                className="flex items-center justify-between p-4 border rounded-lg"
-              >
-                <div>
-                  <h3 className="font-medium capitalize">{platform}</h3>
-                  {platform_username && (
-                    <p className="text-sm text-gray-500">@{platform_username}</p>
+            {displayConnections.map(({ platform, platform_username, connected, profile_picture }) => (
+                <div key={platform} className="flex items-start justify-between p-4 border rounded-lg">
+                  <div className="flex items-start gap-4">
+                    <PlatformIcon platform={platform} />
+                    
+                    {connected ? (
+                      <div className="flex items-start gap-4">
+                        {profile_picture && (
+                          <Image src={profile_picture} alt={platform_username || platform} width={40} height={40} className="h-10 w-10 rounded-full" />
+                        )}
+                        
+                        <div className="space-y-1">
+                          <h3 className="font-medium capitalize">{platform}</h3>
+                          <div className="text-sm space-y-1">
+                            <p><span className="font-medium"></span> @{platform_username}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="font-medium capitalize">{platform}</h3>
+                        <p className="text-sm text-muted-foreground">Not connected</p>
+                      </div>
+                    )}
+                  </div>
+                  {connected ? (
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleDisconnect(platform)}
+                      size="sm"
+                    >
+                      Disconnect
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => window.location.href = `/api/auth/${platform}/start`}
+                      size="sm"
+                    >
+                      Connect
+                    </Button>
                   )}
                 </div>
-                {platform === "tiktok" ? (
-                  <TikTokLoginButton />
-                ) : platform === "instagram" ? (
-                  <InstagramLoginButton />
-                ) : platform === "youtube" ? (
-                  <YouTubeLoginButton />
-                ) : (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleConnect(platform)}
-                    disabled={connected || isLoading}
-                  >
-                    Connect
-                  </Button>
-                )}
-                <Button
-                  variant={connected ? "destructive" : "default"}
-                  onClick={() =>
-                    connected ? handleDisconnect(platform) : handleConnect(platform)
-                  }
-                >
-                  {connected ? "Disconnect" : "Connect"}
-                </Button>
-              </div>
             ))}
           </div>
         )}

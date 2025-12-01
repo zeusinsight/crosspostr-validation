@@ -1,15 +1,27 @@
-import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { getUserFromRequest } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
   const error = searchParams.get("error");
 
   if (error || !code) {
     console.error("Instagram auth error:", error);
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/protected?error=instagram_auth_failed`
+    );
+  }
+
+  const cookieStore = await cookies();
+  const csrfState = cookieStore.get("csrfState")?.value;
+
+  if (!state || !csrfState || state !== csrfState) {
+    console.error("CSRF validation failed - state mismatch");
+    return NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_APP_URL}/protected?error=invalid_csrf_state`
     );
   }
 
@@ -76,19 +88,12 @@ export async function GET(req: NextRequest) {
       profile_picture_url?: string;
     } = await userInfoRes.json();
 
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
-
-    if (userErr || !user) {
+    const { user, supabase } = await getUserFromRequest();
+    if (!user) {
       throw new Error("User not authenticated");
     }
-
     const { error: dbErr } = await supabase
-      .from("social_connections")
+      .from("platform_validation")
       .upsert({
         user_id: user.id,
         platform: "instagram",
@@ -97,21 +102,27 @@ export async function GET(req: NextRequest) {
         token_expires_at: new Date(Date.now() + longLivedTokenData.expires_in * 1000).toISOString(),
         platform_user_id: userInfo.id,
         platform_username: userInfo.username,
+        profile_picture: userInfo.profile_picture_url,
       })
       .select()
       .single();
 
     if (dbErr) {
+      console.error("Database insertion error:", dbErr);
       throw dbErr;
     }
 
-    return NextResponse.redirect(
+    const response = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/protected?success=instagram_connected`
     );
+    response.cookies.delete("csrfState");
+    return response;
   } catch (e) {
     console.error("Instagram callback error:", e);
-    return NextResponse.redirect(
+    const response = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/protected?error=instagram_connection_failed`
     );
+    response.cookies.delete("csrfState");
+    return response;
   }
 }

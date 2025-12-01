@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     // Get user's TikTok social connection
     const { data: conn, error: connErr } = await adminClient
-      .from("social_connections")
+      .from("platform_validation")
       .select("access_token, refresh_token, token_expires_at")
       .eq("user_id", user.id)
       .eq("platform", "tiktok")

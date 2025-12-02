@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export const runtime = "edge";
-
 // POST /api/instagram/upload
 // multipart/form-data { file, description }
 export async function POST(req: NextRequest) {

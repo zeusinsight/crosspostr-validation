@@ -7,7 +7,7 @@ export async function GET() {
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`;
 
   // Permissions Instagram Business API
-  const scope = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights";
+  const scope = "instagram_business_basic,instagram_business_content_publish";
 
   const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&state=${csrfState}`;
 

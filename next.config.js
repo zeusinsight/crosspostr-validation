@@ -4,23 +4,15 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "p16-sign-va.tiktokcdn.com",
+        hostname: "*.tiktokcdn-eu.com",
       },
       {
         protocol: "https",
-        hostname: "p16-pu-sign-no.tiktokcdn-eu.com",
-      },
-      {
-        protocol: "https",
-        hostname: "scontent-cdg4-2.cdninstagram.com",
+        hostname: "*.cdninstagram.com",
       },
       {
         protocol: "https",
         hostname: "*.fbcdn.net",
-      },
-      {
-        protocol: "https",
-        hostname: "scontent.cdninstagram.com",
       },
       {
         protocol: "https",

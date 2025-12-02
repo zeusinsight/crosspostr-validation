@@ -6,6 +6,23 @@ import { NextRequest, NextResponse } from "next/server";
  * GET endpoint to retrieve the authenticated user's TikTok videos
  * Returns a list of videos from the user's TikTok account
  */
+
+interface TikTokVideo {
+  id: string;
+  title?: string;
+  cover_image_url?: string;
+  share_url?: string;
+  video_description?: string;
+  create_time?: number;
+  duration?: number;
+  height?: number;
+  width?: number;
+  view_count?: number;
+  like_count?: number;
+  comment_count?: number;
+  share_count?: number;
+}
+
 export async function GET(req: NextRequest) {
   try {
     // Get user from request using the getUserFromRequest function as specified in user rules
@@ -113,7 +130,7 @@ export async function GET(req: NextRequest) {
     const videosData = await videosResponse.json();
     
     // Return the videos data with only ID and description
-    const videos = videosData.data?.videos?.map((video: any) => ({
+    const videos = videosData.data?.videos?.map((video: TikTokVideo) => ({
       id: video.id,
       description: video.video_description || video.title || ''
     })) || [];

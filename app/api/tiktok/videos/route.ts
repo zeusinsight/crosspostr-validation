@@ -112,12 +112,14 @@ export async function GET(req: NextRequest) {
 
     const videosData = await videosResponse.json();
     
-    // Log successful response for debugging
-    console.log("TikTok videos fetched successfully");
+    // Return the videos data with only ID and description
+    const videos = videosData.data?.videos?.map((video: any) => ({
+      id: video.id,
+      description: video.video_description || video.title || ''
+    })) || [];
 
-    // Return the videos data
     return NextResponse.json({
-      videos: videosData.data?.videos || [],
+      videos,
       cursor: videosData.data?.cursor || null,
       has_more: videosData.data?.has_more || false
     });

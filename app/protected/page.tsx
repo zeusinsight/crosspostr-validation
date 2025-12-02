@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SocialConnections } from "@/components/social-connections";
 import { VideoUpload } from "@/components/video-upload";
 import { FacebookPageSelector } from "@/components/facebook-page-selector";
+import { TikTokVideosList } from "@/components/tiktok-videos-list";
 import { useEffect, useState } from "react";
 import { useSocialConnections } from "@/hooks/use-social-connections";
 import { Suspense } from "react";
@@ -72,6 +73,9 @@ function ProtectedPageContent() {
           <VideoUpload />
         </div>
       </div>
+      
+      <TikTokVideosList />
+      
       {showFacebookSelector && (
         <FacebookPageSelector
           onPageSelected={handlePageSelected}

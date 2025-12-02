@@ -74,7 +74,7 @@ function ProtectedPageContent() {
         </div>
       </div>
       
-      <TikTokVideosList />
+      {/*<TikTokVideosList />*/}
       
       {showFacebookSelector && (
         <FacebookPageSelector
